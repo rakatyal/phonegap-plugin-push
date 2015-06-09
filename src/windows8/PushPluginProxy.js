@@ -1,18 +1,35 @@
-// Copyright (c) Microsoft Open Technologies, Inc.  Licensed under the MIT license. 
-
-module.exports = {
-    register: function (success, fail, args) {
-        try {
-            var onNotificationReceived = window[args[0].ecb];
-
-            Windows.Networking.PushNotifications.PushNotificationChannelManager.createPushNotificationChannelForApplicationAsync().then(
+cordova.define("com.adobe.phonegap.push.PushPlugin", function (require, exports, module) {
+    var myApp = {};
+    module.exports = {
+        init: function (success, fail, args) {
+            var onNotificationReceived = function (e) {
+                var result = {};
+                result.message = JSON.stringify(e);
+                success(result, { keepCallback: true});
+            };
+           
+            Windows.Networking.PushNotifications.PushNotificationChannelManager.createPushNotificationChannelForApplicationAsync().done(
                 function (channel) {
-                    channel.addEventListener("pushnotificationreceived", onNotificationReceived);
-                    success(channel);
-            }, fail);
-        } catch(ex) {
-            fail(ex);
+                    var result = {};
+                    result.registrationId = channel.uri;
+                    myApp.channel = channel;
+                    channel.addEventListener("pushnotificationreceived", function(e) {
+                        onNotificationReceived(e);
+                    });
+                    success(result, { keepCallback: true });
+                }, function (error) {
+                    fail(error);
+                });
+        },
+        unregister: function (success, fail, args) {
+            try {
+                myApp.channel.close();
+                success();
+            } catch(ex) {
+                fail(ex);
+            }
         }
-    }
-};
-require("cordova/windows8/commandProxy").add("PushPlugin", module.exports);
+    };
+require("cordova/exec/proxy").add("PushNotification", module.exports);
+
+});
