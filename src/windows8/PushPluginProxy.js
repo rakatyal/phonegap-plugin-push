@@ -1,32 +1,54 @@
 cordova.define("com.adobe.phonegap.push.PushPlugin", function (require, exports, module) {
     var myApp = {};
+    var pushNotifications = Windows.Networking.PushNotifications;
+
     module.exports = {
-        init: function (success, fail, args) {
+        init: function (onSuccess, onFail, args) {
+
             var onNotificationReceived = function (e) {
                 var result = {};
-                result.message = JSON.stringify(e);
-                success(result, { keepCallback: true});
+                var notificationPayload;
+
+                switch (e.notificationType) {
+                    case pushNotifications.PushNotificationType.toast:
+                        notificationPayload = e.toastNotification.content;
+                        break;
+
+                    case pushNotifications.PushNotificationType.tile:
+                        notificationPayload = e.tileNotification.content;
+                        break;
+
+                    case pushNotifications.PushNotificationType.badge:
+                        notificationPayload = e.badgeNotification.content;
+                        break;
+
+                    case pushNotifications.PushNotificationType.raw:
+                        notificationPayload = e.rawNotification.content;
+                        break;
+                }
+                result.message = JSON.stringify(notificationPayload);
+                onSuccess(result, { keepCallback: true });
             };
-           
-            Windows.Networking.PushNotifications.PushNotificationChannelManager.createPushNotificationChannelForApplicationAsync().done(
+
+            pushNotifications.PushNotificationChannelManager.createPushNotificationChannelForApplicationAsync().done(
                 function (channel) {
                     var result = {};
                     result.registrationId = channel.uri;
                     myApp.channel = channel;
-                    channel.addEventListener("pushnotificationreceived", function(e) {
-                        onNotificationReceived(e);
-                    });
-                    success(result, { keepCallback: true });
+                    channel.addEventListener("pushnotificationreceived", onNotificationReceived);
+                    myApp.notificationEvent = onNotificationReceived;
+                    onSuccess(result, { keepCallback: true });
                 }, function (error) {
-                    fail(error);
+                    onFail(error);
                 });
         },
-        unregister: function (success, fail, args) {
+        unregister: function (onSuccess, onFail, args) {
             try {
+                myApp.channel.removeEventListener("pushnotificationreceived", myApp.notificationEvent);
                 myApp.channel.close();
-                success();
+                onSuccess();
             } catch(ex) {
-                fail(ex);
+                onFail(ex);
             }
         }
     };
