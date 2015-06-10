@@ -2,45 +2,56 @@ cordova.define("com.adobe.phonegap.push.PushPlugin", function (require, exports,
     var myApp = {};
     var pushNotifications = Windows.Networking.PushNotifications;
 
+    var createNotificationJSON = function (e) {
+        var result = {};
+        var notificationPayload;
+
+        switch (e.notificationType) {
+            case pushNotifications.PushNotificationType.toast:
+                notificationPayload = e.toastNotification.content.getXml();
+                break;
+
+            case pushNotifications.PushNotificationType.tile:
+                notificationPayload = e.tileNotification.content.getXml();
+                break;
+
+            case pushNotifications.PushNotificationType.badge:
+                notificationPayload = e.badgeNotification.content.getXml();
+                break;
+
+            case pushNotifications.PushNotificationType.raw:
+                notificationPayload = e.rawNotification.content;
+                break;
+        }
+        result.message = "";
+        result.xmlContent = notificationPayload;
+        result.objectReference = e;
+        return result;
+    }
+
     module.exports = {
         init: function (onSuccess, onFail, args) {
 
             var onNotificationReceived = function (e) {
-                var result = {};
-                var notificationPayload;
-
-                switch (e.notificationType) {
-                    case pushNotifications.PushNotificationType.toast:
-                        notificationPayload = e.toastNotification.content;
-                        break;
-
-                    case pushNotifications.PushNotificationType.tile:
-                        notificationPayload = e.tileNotification.content;
-                        break;
-
-                    case pushNotifications.PushNotificationType.badge:
-                        notificationPayload = e.badgeNotification.content;
-                        break;
-
-                    case pushNotifications.PushNotificationType.raw:
-                        notificationPayload = e.rawNotification.content;
-                        break;
-                }
-                result.message = JSON.stringify(notificationPayload);
+                var result = createNotificationJSON(e);
                 onSuccess(result, { keepCallback: true });
-            };
+            }
 
-            pushNotifications.PushNotificationChannelManager.createPushNotificationChannelForApplicationAsync().done(
-                function (channel) {
-                    var result = {};
-                    result.registrationId = channel.uri;
-                    myApp.channel = channel;
-                    channel.addEventListener("pushnotificationreceived", onNotificationReceived);
-                    myApp.notificationEvent = onNotificationReceived;
-                    onSuccess(result, { keepCallback: true });
-                }, function (error) {
-                    onFail(error);
-                });
+            try {
+                pushNotifications.PushNotificationChannelManager.createPushNotificationChannelForApplicationAsync().done(
+                    function (channel) {
+                        var result = {};
+                        result.registrationId = channel.uri;
+                        myApp.channel = channel;
+                        channel.addEventListener("pushnotificationreceived", onNotificationReceived);
+                        myApp.notificationEvent = onNotificationReceived;
+                        onSuccess(result, { keepCallback: true });
+                    }, function (error) {
+                        onFail(error);
+                    });
+            } catch (ex) {
+                onFail(ex);
+            }
         },
         unregister: function (onSuccess, onFail, args) {
             try {
